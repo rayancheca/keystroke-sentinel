@@ -30,9 +30,19 @@ backend/data/
 
 # Node
 node_modules/
+dist/
 frontend/dist/
 frontend/.env.local
 frontend/.env.*.local
+
+# Root-level dev tooling artifacts
+package.json
+package-lock.json
+scripts/
+
+# Evaluator / builder artifacts
+evaluation.json
+backend/uv.lock
 
 # OS
 .DS_Store
