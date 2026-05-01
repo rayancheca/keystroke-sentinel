@@ -50,7 +50,7 @@ Thumbs.db
 *.swo
 
 # Test coverage
-.coverage
+.coverage*
 htmlcov/
 .pytest_cache/
 
