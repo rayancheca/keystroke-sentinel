@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { AnomalyResult, KeystrokeBurst, WsMessage } from '../lib/types'
+import { isWsMessage } from '../lib/types'
+import type { AnomalyResult, KeystrokeBurst } from '../lib/types'
 
 function getWsBase(): string {
   if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL as string
@@ -12,15 +13,6 @@ const PING_INTERVAL_MS = 15_000
 const RECONNECT_DELAY_MS = 2_000
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
-
-function isWsMessage(value: unknown): value is WsMessage {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'type' in value &&
-    typeof (value as Record<string, unknown>)['type'] === 'string'
-  )
-}
 
 interface UseAnomalyStreamOptions {
   userId: string
