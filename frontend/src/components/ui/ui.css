@@ -1,0 +1,126 @@
+/* StatusBadge */
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid transparent;
+}
+
+.status-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-badge__dot--pulse {
+  animation: badge-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes badge-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.8); }
+}
+
+.status-badge--safe {
+  color: var(--teal);
+  background: var(--teal-glow);
+  border-color: rgba(45, 198, 178, 0.25);
+}
+.status-badge--safe .status-badge__dot { background: var(--teal); }
+
+.status-badge--anomaly {
+  color: var(--amber);
+  background: var(--amber-glow);
+  border-color: rgba(240, 160, 40, 0.3);
+}
+.status-badge--anomaly .status-badge__dot { background: var(--amber); }
+
+.status-badge--neutral,
+.status-badge--pending {
+  color: var(--text-secondary);
+  background: rgba(122, 143, 166, 0.08);
+  border-color: var(--border);
+}
+.status-badge--neutral .status-badge__dot,
+.status-badge--pending .status-badge__dot { background: var(--text-secondary); }
+
+.status-badge--connected {
+  color: var(--green);
+  background: var(--green-dim);
+  border-color: rgba(72, 199, 116, 0.25);
+}
+.status-badge--connected .status-badge__dot { background: var(--green); }
+
+.status-badge--disconnected {
+  color: var(--text-muted);
+  background: rgba(74, 90, 107, 0.1);
+  border-color: var(--border-subtle);
+}
+.status-badge--disconnected .status-badge__dot { background: var(--text-muted); }
+
+.status-badge--error {
+  color: var(--red);
+  background: var(--red-dim);
+  border-color: rgba(224, 85, 85, 0.25);
+}
+.status-badge--error .status-badge__dot { background: var(--red); }
+
+
+/* MetricCard */
+.metric-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4) var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  transition: border-color var(--duration-normal) var(--ease-out);
+}
+
+.metric-card--sm { padding: var(--space-3) var(--space-4); }
+.metric-card--lg { padding: var(--space-5) var(--space-6); }
+
+.metric-card--amber { border-color: var(--amber-dim); }
+.metric-card--teal { border-color: var(--teal-dim); }
+.metric-card--red { border-color: rgba(224, 85, 85, 0.35); }
+
+.metric-card__label {
+  font-size: var(--text-xs);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.metric-card__value {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.metric-card__number {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xl);
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.metric-card--amber .metric-card__number { color: var(--amber); }
+.metric-card--teal .metric-card__number { color: var(--teal); }
+.metric-card--red .metric-card__number { color: var(--red); }
+
+.metric-card__unit {
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+}

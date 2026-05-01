@@ -1,0 +1,78 @@
+/*
+  Visual direction: scientific-instrument security aesthetic.
+  Users live in terminals, SIEMs, oscilloscopes.
+  Data is urgent + technical: behavioral biometric signals.
+  Communicates precision, trust, measured authority.
+  Amber = the signal / alert channel. Teal = the baseline / safe state.
+*/
+:root {
+  /* Backgrounds */
+  --bg: #111418;
+  --surface: #1a1f26;
+  --surface-elevated: #222932;
+  --surface-glass: rgba(34, 41, 50, 0.85);
+
+  /* Borders */
+  --border: #2d3640;
+  --border-subtle: #202830;
+  --border-bright: #3d4f60;
+
+  /* Text */
+  --text-primary: #e2e6eb;
+  --text-secondary: #7a8fa6;
+  --text-muted: #4a5a6b;
+  --text-mono: #c8d8e8;
+
+  /* Signal colors — amber = anomaly / alert */
+  --amber: #f0a028;
+  --amber-dim: #b07018;
+  --amber-glow: rgba(240, 160, 40, 0.15);
+
+  /* Baseline colors — teal = enrolled / safe */
+  --teal: #2dc6b2;
+  --teal-dim: #1d8a7c;
+  --teal-glow: rgba(45, 198, 178, 0.12);
+
+  /* Status colors */
+  --red: #e05555;
+  --red-dim: rgba(224, 85, 85, 0.15);
+  --green: #48c774;
+  --green-dim: rgba(72, 199, 116, 0.12);
+
+  /* Typography */
+  --font-ui: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Fira Code', monospace;
+
+  /* Type scale */
+  --text-xs: 0.6875rem;
+  --text-sm: 0.75rem;
+  --text-base: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.5rem;
+
+  /* Spacing */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Radii */
+  --radius-sm: 3px;
+  --radius: 5px;
+  --radius-lg: 8px;
+  --radius-pill: 100px;
+
+  /* Transitions */
+  --duration-fast: 120ms;
+  --duration-normal: 220ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
