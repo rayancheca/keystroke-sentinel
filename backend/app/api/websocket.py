@@ -7,17 +7,21 @@ from app.models.enrollment import KeystrokeBurst, AnomalyResult
 from app.models.session import get_or_create_session, remove_session
 from app.features.extractor import extract_features
 from app.ml.storage import load_bundle
+from app.ml.classifier import score_burst
 from app.core.config import settings
 from app.core.logging import logger
 
 router = APIRouter()
 
 
-async def _send_json(ws: WebSocket, data: dict) -> None:
+async def _send_json(ws: WebSocket, data: dict) -> bool:
+    """Send JSON to the client. Returns False if the send fails."""
     try:
         await ws.send_text(json.dumps(data))
-    except Exception:
-        pass
+        return True
+    except Exception as exc:
+        logger.debug("WS send failed: %s", exc)
+        return False
 
 
 @router.websocket("/ws/{user_id}/{session_id}")
@@ -44,7 +48,12 @@ async def keystroke_stream(
     try:
         while True:
             raw = await websocket.receive_text()
-            payload = json.loads(raw)
+
+            try:
+                payload = json.loads(raw)
+            except json.JSONDecodeError:
+                await _send_json(websocket, {"type": "error", "message": "invalid JSON"})
+                continue
 
             if payload.get("type") == "ping":
                 await _send_json(websocket, {"type": "pong"})
@@ -60,6 +69,14 @@ async def keystroke_stream(
                 await _send_json(websocket, {"type": "error", "message": str(exc)})
                 continue
 
+            # Reject bursts that don't match the authenticated session
+            if burst.user_id != user_id or burst.session_id != session_id:
+                await _send_json(websocket, {
+                    "type": "error",
+                    "message": "burst user_id/session_id mismatch",
+                })
+                continue
+
             if len(burst.events) < 5:
                 continue
 
@@ -71,8 +88,17 @@ async def keystroke_stream(
                 canonical_digraphs=bundle.canonical_digraphs,
             )
 
-            from app.ml.classifier import score_burst
-            anomaly_score = score_burst(bundle, vec)
+            try:
+                anomaly_score = score_burst(bundle, vec)
+            except ValueError as exc:
+                logger.warning(
+                    "Feature dimension mismatch for user=%s: %s", user_id, exc
+                )
+                await _send_json(websocket, {
+                    "type": "error",
+                    "message": "Feature vector dimension mismatch — re-enroll to fix.",
+                })
+                continue
 
             is_anomalous = anomaly_score > settings.anomaly_threshold
             live.anomaly_history.append(anomaly_score)

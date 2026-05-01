@@ -16,10 +16,11 @@ interface LiveDashboardProps {
   onSignOut: () => void
 }
 
-const SESSION_ID = `session-${Date.now()}`
 const DEFAULT_THRESHOLD = 0.65
 
 export function LiveDashboard({ userId, onSignOut }: LiveDashboardProps) {
+  // Per-mount session ID — fresh on every remount so no session ID collision after sign-out
+  const sessionId = useRef(`session-${Date.now()}`).current
   const [threshold, setThreshold] = useState(DEFAULT_THRESHOLD)
   const [scoreHistory, setScoreHistory] = useState<number[]>([])
   const [lastResult, setLastResult] = useState<AnomalyResult | null>(null)
@@ -29,21 +30,26 @@ export function LiveDashboard({ userId, onSignOut }: LiveDashboardProps) {
   const [wsError, setWsError] = useState<string | null>(null)
   const [totalKeystrokes, setTotalKeystrokes] = useState(0)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // Ref-based challenge flag to avoid stale closure in handleScore
+  const challengeActiveRef = useRef(false)
+  const thresholdRef = useRef(threshold)
+  thresholdRef.current = threshold
 
   const handleScore = useCallback((result: AnomalyResult) => {
     setLastResult(result)
     setScoreHistory((prev) => [...prev, result.anomaly_score])
     setBurstCount((n) => n + 1)
 
-    if (result.anomaly_score > threshold && !showChallenge) {
+    if (result.anomaly_score > thresholdRef.current && !challengeActiveRef.current) {
+      challengeActiveRef.current = true
       setChallengeScore(result.anomaly_score)
       setShowChallenge(true)
     }
-  }, [threshold, showChallenge])
+  }, [])
 
   const { state: wsState, sendBurst } = useAnomalyStream({
     userId,
-    sessionId: SESSION_ID,
+    sessionId,
     onScore: handleScore,
     onError: setWsError,
     enabled: true,
@@ -58,13 +64,13 @@ export function LiveDashboard({ userId, onSignOut }: LiveDashboardProps) {
     setTotalKeystrokes((n) => n + state.events.length)
     sendBurst({
       user_id: userId,
-      session_id: SESSION_ID,
+      session_id: sessionId,
       events: state.events,
       wpm: state.wpm,
       error_count: state.errorCount,
       word_count: state.wordCount,
     })
-  }, [userId, sendBurst])
+  }, [userId, sessionId, sendBurst])
 
   useKeystrokeCapture({
     onBurst: handleBurst,
@@ -216,11 +222,11 @@ export function LiveDashboard({ userId, onSignOut }: LiveDashboardProps) {
           anomalyScore={challengeScore}
           userId={userId}
           onConfirm={(_password) => {
-            // In a real system this would verify the password server-side.
-            // Here we just dismiss and reset the anomaly flag.
+            challengeActiveRef.current = false
             setShowChallenge(false)
           }}
           onDismiss={() => {
+            challengeActiveRef.current = false
             setShowChallenge(false)
             onSignOut()
           }}

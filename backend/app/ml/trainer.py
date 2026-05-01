@@ -6,7 +6,6 @@ from typing import Optional
 from app.features.extractor import (
     extract_features,
     build_canonical_digraphs,
-    set_canonical_digraphs,
     _digraph_latencies,
 )
 from app.ml.classifier import train_classifier, ClassifierBundle
@@ -33,7 +32,7 @@ def get_keystroke_count(user_id: str) -> int:
     return sum(len(b.events) for b in bursts)
 
 
-def train_user_model(user_id: str) -> ClassifierBundle:
+def train_user_model(user_id: str) -> tuple[ClassifierBundle, str]:
     """
     Build canonical digraphs, extract feature vectors, and train the classifier.
     Raises ValueError if not enough data.
@@ -44,7 +43,6 @@ def train_user_model(user_id: str) -> ClassifierBundle:
 
     digraph_maps = _digraph_buffer.get(user_id, [])
     canonical = build_canonical_digraphs(digraph_maps)
-    set_canonical_digraphs(canonical)
 
     vectors: list[np.ndarray] = []
     for burst in bursts:
@@ -70,9 +68,9 @@ def train_user_model(user_id: str) -> ClassifierBundle:
     )
 
     bundle = train_classifier(X, feature_names, canonical)
-    path = save_bundle(user_id, bundle)
-    logger.info("Model trained for %s: accuracy=%.3f, path=%s", user_id, bundle.accuracy, path)
-    return bundle
+    saved_path = save_bundle(user_id, bundle)
+    logger.info("Model trained for %s: accuracy=%.3f, path=%s", user_id, bundle.accuracy, saved_path)
+    return bundle, saved_path
 
 
 def clear_buffer(user_id: str) -> None:

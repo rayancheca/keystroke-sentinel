@@ -1,11 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { AnomalyResult, KeystrokeBurst, WsMessage } from '../lib/types'
 
-const WS_BASE = import.meta.env.VITE_WS_URL ?? 'ws://localhost:8000'
+function getWsBase(): string {
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL as string
+  const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  return `${proto}//${window.location.host}`
+}
+
+const WS_BASE = getWsBase()
 const PING_INTERVAL_MS = 15_000
 const RECONNECT_DELAY_MS = 2_000
 
 type ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error'
+
+function isWsMessage(value: unknown): value is WsMessage {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'type' in value &&
+    typeof (value as Record<string, unknown>)['type'] === 'string'
+  )
+}
 
 interface UseAnomalyStreamOptions {
   userId: string
@@ -25,7 +40,12 @@ export function useAnomalyStream({
   const ws = useRef<WebSocket | null>(null)
   const pingTimer = useRef<ReturnType<typeof setInterval> | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const enabledRef = useRef(enabled)
   const [state, setState] = useState<ConnectionState>('disconnected')
+
+  useEffect(() => {
+    enabledRef.current = enabled
+  }, [enabled])
 
   const clearTimers = useCallback(() => {
     if (pingTimer.current) clearInterval(pingTimer.current)
@@ -33,7 +53,7 @@ export function useAnomalyStream({
   }, [])
 
   const connect = useCallback(() => {
-    if (!enabled || !userId || !sessionId) return
+    if (!enabledRef.current || !userId || !sessionId) return
     setState('connecting')
     const url = `${WS_BASE}/ws/${encodeURIComponent(userId)}/${encodeURIComponent(sessionId)}`
     const socket = new WebSocket(url)
@@ -49,12 +69,15 @@ export function useAnomalyStream({
     }
 
     socket.onmessage = (ev) => {
-      let msg: WsMessage
+      let parsed: unknown
       try {
-        msg = JSON.parse(ev.data as string) as WsMessage
+        parsed = JSON.parse(ev.data as string)
       } catch {
         return
       }
+      if (!isWsMessage(parsed)) return
+
+      const msg = parsed
       if (msg.type === 'anomaly_score') onScore(msg.data)
       if (msg.type === 'error') onError?.(msg.message)
     }
@@ -66,11 +89,11 @@ export function useAnomalyStream({
     socket.onclose = () => {
       clearTimers()
       setState('disconnected')
-      if (enabled) {
+      if (enabledRef.current) {
         reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY_MS)
       }
     }
-  }, [userId, sessionId, enabled, onScore, onError, clearTimers])
+  }, [userId, sessionId, onScore, onError, clearTimers])
 
   const disconnect = useCallback(() => {
     clearTimers()

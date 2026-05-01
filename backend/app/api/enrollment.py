@@ -87,7 +87,7 @@ async def train_model(
         )
 
     try:
-        bundle = train_user_model(user_id)
+        bundle, saved_path = train_user_model(user_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -98,7 +98,7 @@ async def train_model(
     if row:
         row.is_trained = 1
         row.accuracy = bundle.accuracy
-        row.model_path = bundle.feature_names[0]
+        row.model_path = saved_path
         row.feature_importance = json.dumps(bundle.feature_importance)
         row.updated_at = datetime.utcnow()
         await db.commit()
@@ -108,7 +108,7 @@ async def train_model(
         accuracy=bundle.accuracy,
         cv_scores=bundle.cv_scores,
         feature_importance=bundle.feature_importance,
-        model_path=str(user_id) + ".joblib",
+        model_path=saved_path,
     )
 
 

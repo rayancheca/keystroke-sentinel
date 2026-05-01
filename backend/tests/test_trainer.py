@@ -61,9 +61,10 @@ class TestTrainUserModel:
         clear_buffer("trainer_user")
         for _ in range(12):
             buffer_burst("trainer_user", make_burst("trainer_user"))
-        bundle = train_user_model("trainer_user")
+        bundle, saved_path = train_user_model("trainer_user")
         assert bundle.accuracy > 0.0
         assert len(bundle.feature_names) > 0
+        assert saved_path.endswith(".joblib")
 
     def test_no_data_raises(self) -> None:
         clear_buffer("trainer_user")

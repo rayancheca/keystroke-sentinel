@@ -13,6 +13,14 @@ const TYPING_PROMPTS = [
   'Mr. Jock, TV quiz PhD, bags few lynx. Blowzy red vixens fight for a quick jump.',
 ]
 
+const USER_ID_PATTERN = /^[^\s/\\<>&"']{1,128}$/
+
+function validateUserId(id: string): string | null {
+  if (!id.trim()) return 'User ID is required'
+  if (!USER_ID_PATTERN.test(id.trim())) return 'Invalid user ID — no spaces or special characters'
+  return null
+}
+
 interface EnrollmentPaneProps {
   onEnrolled: (userId: string) => void
 }
@@ -30,6 +38,7 @@ export function EnrollmentPane({ onEnrolled }: EnrollmentPaneProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const promptIndex = useRef(0)
   const sessionId = useRef(`enroll-${Date.now()}`)
+  const consecutiveBurstFailures = useRef(0)
 
   const handleBurst = useCallback(async (state: {
     events: Array<{ key: string; press_time: number; release_time: number }>
@@ -48,11 +57,18 @@ export function EnrollmentPane({ onEnrolled }: EnrollmentPaneProps) {
         error_count: state.errorCount,
         word_count: state.wordCount,
       })
+      consecutiveBurstFailures.current = 0
       setKeystrokeCount(resp.keystroke_count)
-      setStatus((prev) => prev ? { ...prev, keystroke_count: resp.keystroke_count, progress_pct: resp.progress_pct } : null)
+      setStatus((prev) =>
+        prev ? { ...prev, keystroke_count: resp.keystroke_count, progress_pct: resp.progress_pct } : null
+      )
     } catch (e) {
-      // Non-fatal — burst just fails silently during typing
-      void e
+      consecutiveBurstFailures.current += 1
+      if (consecutiveBurstFailures.current >= 3) {
+        setError(
+          `Bursts are not reaching the server (${e instanceof Error ? e.message : 'unknown error'}). Check the backend is running.`
+        )
+      }
     }
   }, [userId])
 
@@ -64,7 +80,11 @@ export function EnrollmentPane({ onEnrolled }: EnrollmentPaneProps) {
   })
 
   const handleStart = async () => {
-    if (!userId.trim()) return
+    const validationError = validateUserId(userId)
+    if (validationError) {
+      setError(validationError)
+      return
+    }
     setError(null)
     try {
       const s = await api.startEnrollment(userId.trim())
@@ -140,7 +160,7 @@ export function EnrollmentPane({ onEnrolled }: EnrollmentPaneProps) {
             />
           </div>
           {error && <p style={{ color: 'var(--red)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}>{error}</p>}
-          <button className="enrollment__btn" onClick={void handleStart as unknown as React.MouseEventHandler} disabled={!userId.trim()}>
+          <button className="enrollment__btn" onClick={() => void handleStart()} disabled={!userId.trim()}>
             Begin enrollment →
           </button>
         </div>

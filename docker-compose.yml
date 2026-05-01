@@ -1,0 +1,29 @@
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - keystroke_data:/app/data
+    environment:
+      DATABASE_URL: sqlite+aiosqlite:///./data/keystroke_sentinel.db
+      MODEL_STORAGE_PATH: ./data/models
+      ANOMALY_THRESHOLD: "0.65"
+      ENROLLMENT_MIN_KEYSTROKES: "300"
+      CORS_ORIGINS: '["http://localhost", "http://localhost:80"]'
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  keystroke_data:
