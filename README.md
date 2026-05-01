@@ -7,6 +7,8 @@
 [![React](https://img.shields.io/badge/React-18-61dafb?logo=react)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178c6?logo=typescript)](https://typescriptlang.org)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.4-f7931e?logo=scikitlearn)](https://scikit-learn.org)
+[![Tests](https://img.shields.io/badge/tests-56%20passing-brightgreen)](./backend/tests)
+[![Coverage](https://img.shields.io/badge/coverage-88%25-brightgreen)](./backend)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
 
 ---
@@ -106,11 +108,24 @@ FastAPI Backend (Python)
 
 ---
 
+## Tech stack
+
+| Layer | Technology |
+|-------|-----------|
+| Frontend | React 18, TypeScript 5.5, D3.js v7, Vite |
+| Backend | Python 3.11, FastAPI, SQLAlchemy (async), Pydantic v2 |
+| ML | scikit-learn (RandomForestClassifier), NumPy, joblib |
+| Transport | WebSocket (persistent, per-session) |
+| Storage | SQLite (enrollment metadata), joblib files (model artifacts) |
+| Serving | Nginx reverse proxy, Docker Compose |
+
+---
+
 ## Installation
 
-### Option A: Local dev (recommended for development)
+**Requirements:** Python 3.11+, Node.js 20+
 
-**Requirements:** Python 3.11, Node.js 20+
+### Option A: Local dev
 
 ```bash
 git clone https://github.com/rayancheca/keystroke-sentinel.git
@@ -120,9 +135,9 @@ cd keystroke-sentinel
 cd backend
 python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --port 8000
 
-# Frontend (in a separate terminal)
+# Frontend (separate terminal)
 cd frontend
 npm install
 npm run dev
@@ -140,11 +155,27 @@ Open `http://localhost`.
 
 ---
 
+## Environment variables
+
+Copy `.env.example` to `.env` in the `backend/` directory and adjust as needed.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | `sqlite:///./keystroke_sentinel.db` | SQLAlchemy connection string |
+| `MODEL_STORAGE_PATH` | `./models` | Directory for joblib model artifacts |
+| `ANOMALY_THRESHOLD` | `0.65` | Default decision boundary (overridable per-session) |
+| `ENROLLMENT_MIN_SECONDS` | `60` | Minimum typing duration before training is permitted |
+| `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated allowed CORS origins |
+| `VITE_API_URL` | `http://localhost:8000` | Backend REST base URL (frontend) |
+| `VITE_WS_URL` | `ws://localhost:8000` | WebSocket base URL (frontend) |
+
+---
+
 ## Usage
 
 ### 1. Enroll
 
-Enter a user ID and type naturally for ~2-3 minutes until the progress bar reaches 100% (300 keystrokes). Use the "Next prompt" button to get fresh text. Click **Train classifier** when ready.
+Enter a user ID and type naturally for ~2-3 minutes until the progress bar reaches 100% (300 keystrokes). Use the "Next prompt" button to get fresh text prompts. Click **Train classifier** when ready.
 
 The enrollment screen shows:
 - A progress bar tracking total keystrokes collected
@@ -154,36 +185,51 @@ The enrollment screen shows:
 
 ### 2. Monitor
 
-After enrollment, the live dashboard opens:
+After enrollment, the live dashboard opens automatically:
 
 - **Behavioral waveform**: D3 scrolling timeline of anomaly score per typing burst (teal = safe, amber = anomalous)
-- **Score ring**: Current anomaly score as a radial fill
+- **Score ring**: Current anomaly score as a radial SVG fill
 - **Feature snapshot**: Bar chart of live biometric features per burst
 - **Threshold slider**: Tune sensitivity (0.30 = very sensitive, 0.90 = lenient)
 
 ### 3. Re-auth challenge
 
-When the anomaly score exceeds the threshold, a modal freezes the session and requests password re-verification.
+When the anomaly score exceeds the threshold for a burst, a modal freezes the session and requests password re-verification. Confirming restores the session and resets the anomaly state.
 
 ---
 
 ## Technical deep-dive
 
-### Why Random Forest over a neural net?
+### The 63-dimensional feature vector
 
-Behavioral biometrics with small enrollment datasets (300–2000 keystrokes) produce ~15–100 feature vectors per user. Neural networks need orders of magnitude more data. Random Forest handles this regime naturally, produces calibrated probabilities via `predict_proba`, and outputs feature importances that make the system interpretable. Cross-validated accuracy on 5-fold splits provides an honest estimate of generalization.
+Each keystroke burst is transformed into a fixed-length vector of 63 features:
+
+- **Dwell statistics** (5 features): mean, std, median, p25, p75 of key hold durations in milliseconds
+- **Flight statistics** (5 features): same moments on inter-key release-to-press gaps, filtered to the physiologically plausible range [−50ms, 2000ms]
+- **Aggregate stats** (3 features): mean/std of all timing values combined, WPM, error rate
+- **Digraph latencies** (50 features): press-to-press latency for the user's 50 most frequent key pairs, filled with the session mean for unobserved pairs
+
+The 50 digraph slots are determined once at enrollment time from the user's own typing frequency distribution — not from a fixed language corpus. This means two users who type the same text end up with different canonical digraph sets if they have different co-occurrence patterns.
+
+### Why Random Forest, not a neural net
+
+Behavioral biometrics with small enrollment datasets (300–2000 keystrokes) produce ~15–100 feature vectors per user — far too few for neural networks. Random Forest handles this regime naturally, produces calibrated probabilities via `predict_proba`, outputs feature importances for interpretability, and requires no hyperparameter tuning beyond tree count. Cross-validated accuracy on 5-fold splits provides an honest out-of-sample estimate.
 
 ### The impostor synthesis problem
 
-One-class classifiers (Isolation Forest, One-Class SVM) tend to underperform on keystroke data because the genuine class is tightly clustered while the "everything else" space is unbounded. Instead, we synthesize synthetic impostors during training: we perturb genuine feature vectors by sampling noise with 1.5–3× the genuine population's standard deviation. This gives the RF a balanced binary classification problem and empirically outperforms pure one-class approaches on held-out tests.
+One-class classifiers (Isolation Forest, One-Class SVM) underperform on keystroke data because the genuine class is tightly clustered while "everything else" is an unbounded, high-dimensional space. Instead, synthetic impostors are generated at training time by perturbing genuine feature vectors with Gaussian noise sampled at 1.5–3× the genuine population's standard deviation. This gives the classifier a balanced binary problem and empirically outperforms pure one-class approaches on held-out tests.
 
-### Digraph selection is non-obvious
+### Digraph selection and the curse of dimensionality
 
-Raw keystroke data is high-dimensional: a full digraph matrix has 26²+ = 700+ potential key pairs. But most pairs appear rarely in any given session. We compute the frequency of each digraph across all enrollment bursts and select the top-50 most stable pairs as the canonical feature set. Unknown digraphs in live bursts are filled with the session mean. This keeps the feature vector fixed at training time and prevents the curse of dimensionality.
+A full digraph matrix covers 26² = 676 possible alphabetic key pairs, but most pairs appear fewer than 5 times in any 300-keystroke session — too sparse for reliable latency estimates. The enrollment pipeline computes each pair's frequency across all bursts, ranks them, and fixes the top-50 as the canonical feature set. This threshold was chosen to keep the vector small enough that a 100-sample RF can generalize while capturing enough pair diversity to distinguish typing rhythms. Unknown digraphs in live bursts fall back to the session mean to avoid NaN propagation.
+
+### Concurrency safety: no global mutable state in the inference path
+
+An early version stored the canonical digraph list as a module-level mutable list — safe for a single user but broken under concurrent enrollment. The enrollment pipeline now returns the digraph list as a value attached to the trained model artifact. Each model file is loaded into an in-memory LRU cache keyed by user ID, so concurrent sessions for different users are fully isolated. The WebSocket handler holds no mutable state beyond the session ID and the cached model reference.
 
 ### WebSocket burst protocol
 
-Rather than streaming individual keystrokes (which would create thousands of round-trips per minute), telemetry is batched into bursts. Each burst contains all key events in a 2.5-second window, WPM, and error counts. The backend extracts features from the burst atomically — this is important because digraph latencies are computed from the sequence of events in order, not from individual events.
+Rather than streaming individual keystrokes (thousands of round-trips per minute), telemetry is batched into 2.5-second windows. Each burst contains the full sequence of key events in order, WPM, and error counts. The backend extracts digraph features from the ordered sequence atomically — pair latencies are undefined if computed from a shuffled or partial event list, so the burst boundary is the minimum unit of inference.
 
 ---
 
@@ -195,7 +241,16 @@ source .venv/bin/activate
 pytest --cov=app --cov-report=term-missing
 ```
 
-56 tests, 80%+ coverage across the feature extractor, ML classifier, trainer, storage, session management, and API endpoints.
+56 tests, 88% coverage across the feature extractor, ML classifier, trainer, storage, session management, API endpoints, and WebSocket handler.
+
+**Test breakdown:**
+- `test_features.py` — feature extraction correctness, edge cases (empty events, single events, overlapping keys)
+- `test_classifier.py` — RF training, predict_proba output range, impostor synthesis
+- `test_trainer.py` — enrollment pipeline, digraph canonical set selection
+- `test_websocket.py` — WebSocket lifecycle, JSON validation, anomaly scoring path
+- `test_api.py` / `test_api_extended.py` — REST enrollment endpoints, error cases
+- `test_session.py` — in-memory session store thread safety
+- `test_core.py` — config loading, structured logging
 
 ---
 
@@ -207,17 +262,20 @@ keystroke-sentinel/
 │   ├── app/
 │   │   ├── api/          # FastAPI routes (enrollment REST + WebSocket)
 │   │   ├── core/         # Config, structured logging
-│   │   ├── features/     # Keystroke feature extraction
+│   │   ├── features/     # Keystroke feature extraction (extractor.py)
 │   │   ├── ml/           # Random Forest classifier, trainer, model storage
 │   │   └── models/       # Pydantic schemas, SQLAlchemy models, session store
-│   └── tests/            # 56 unit + integration tests
+│   ├── tests/            # 56 unit + integration tests
+│   └── requirements.txt
 ├── frontend/
 │   └── src/
 │       ├── components/   # Enrollment UI, live dashboard, D3 charts, re-auth
 │       ├── hooks/        # useKeystrokeCapture, useAnomalyStream
 │       ├── lib/          # API client, TypeScript types
 │       └── styles/       # Design tokens, global styles
-└── docker-compose.yml
+├── docs/screenshots/     # Live workflow screenshots
+├── docker-compose.yml
+└── .env.example
 ```
 
 ---
