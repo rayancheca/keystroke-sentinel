@@ -19,6 +19,52 @@ This is not a novelty demo. The feature engineering is real: the system builds d
 
 ---
 
+## Live workflow
+
+A full end-to-end run: enrollment → classifier training → live behavioral monitoring → anomaly detection → re-auth challenge.
+
+**1. Enrollment screen** — enter a user identity to begin capturing your keystroke baseline.
+
+![01 enrollment empty state](docs/screenshots/01_enrollment_empty.png)
+
+**2. User ID entered** — identity is validated before any API calls are made.
+
+![02 user ID entered](docs/screenshots/02_enrollment_user_id_entered.png)
+
+**3. Typing phase begins** — keystroke events are captured in real time (dwell, flight, digraph latencies) and batched into 2.5s bursts.
+
+![03 typing phase](docs/screenshots/03_enrollment_typing_phase.png)
+
+**4. Keystrokes accumulating** — the progress bar tracks keystroke count toward the 300-keystroke training threshold; WPM updates live.
+
+![04 typing progress](docs/screenshots/04_enrollment_typing_progress.png)
+
+**5. Ready to train** — 300+ keystrokes collected; the Train classifier button activates.
+
+![05 ready to train](docs/screenshots/05_enrollment_ready_to_train.png)
+
+**6. Training complete** — Random Forest trained with 5-fold cross-validation (95.8% accuracy shown). Feature importance chart reveals which timing statistics drive classification.
+
+![06 training complete with CV scores and feature importances](docs/screenshots/06_enrollment_training_complete.png)
+
+**7. Live monitoring dashboard** — WebSocket connected; behavioral waveform, feature snapshot, session score ring, and threshold slider are live.
+
+![07 dashboard connected](docs/screenshots/07_dashboard_connected.png)
+
+**8. Genuine typing scored** — burst arrives, classifier scores 26% anomaly (well below 0.65 threshold), status shows NOMINAL.
+
+![08 live scoring nominal](docs/screenshots/08_dashboard_live_scoring.png)
+
+**9. Waveform history building** — multiple bursts scored; the D3 timeline shows the behavioral signal across the session.
+
+![09 waveform history](docs/screenshots/09_dashboard_waveform_history.png)
+
+**10. Anomaly detected — re-auth challenge fires** — robotic uniform-cadence typing scores 95.4% anomaly, crossing the threshold. Session freezes and the re-auth modal demands identity verification.
+
+![10 re-auth challenge 95.4% anomaly](docs/screenshots/10_dashboard_reauth_challenge.png)
+
+---
+
 ## Architecture
 
 ```
